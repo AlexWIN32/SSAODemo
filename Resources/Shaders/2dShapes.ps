@@ -1,0 +1,31 @@
+/*******************************************************************************
+    Author: Alexey Frolov (alexwin32@mail.ru)
+
+    This software is distributed freely under the terms of the MIT License.
+    See "LICENSE" or "http://copyfree.org/content/standard/licenses/mit/license.txt".
+*******************************************************************************/
+
+#include "2dShapes.fxh"
+
+cbuffer buff1 : register(b0)
+{
+    int useColorTex;
+    float3 padding;
+}
+
+cbuffer buff2: register(b1)
+{
+    float4 materialColor;
+}
+
+Texture2D colorTex :register(t0);
+SamplerState colorSampler :register(s0);
+
+float4 ProcessPixel(VsToPs Input) : SV_TARGET
+{
+    float4 texColor = 1.0f;
+    if(useColorTex)
+        texColor = colorTex.Sample(colorSampler, Input.texCoord);
+
+    return texColor * materialColor;
+}

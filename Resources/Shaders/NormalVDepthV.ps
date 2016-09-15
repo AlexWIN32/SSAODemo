@@ -1,0 +1,20 @@
+/*******************************************************************************
+    Author: Alexey Frolov (alexwin32@mail.ru)
+
+    This software is distributed freely under the terms of the MIT License.
+    See "LICENSE" or "http://copyfree.org/content/standard/licenses/mit/license.txt".
+*******************************************************************************/
+
+struct PIn
+{
+    float4 posH : SV_POSITION;
+    float3 normalV : NORMAL;
+    float2 tex : TEXCOORD0;
+    float3 posV : TEXCOORD1;
+};
+
+float4 ProcessPixel(PIn input) : SV_TARGET
+{
+    input.normalV = normalize(input.normalV);
+    return float4(input.normalV, input.posV.z);
+}

@@ -1,0 +1,76 @@
+/*******************************************************************************
+    Author: Alexey Frolov (alexwin32@mail.ru)
+
+    This software is distributed freely under the terms of the MIT License.
+    See "LICENSE" or "http://copyfree.org/content/standard/licenses/mit/license.txt".
+*******************************************************************************/
+
+cbuffer Data : register(b0)
+{
+    float4 kernel[16];
+    matrix proj;
+    matrix invProj;
+    float occlusionRadius;    
+    float2 rndTexFactor;
+    float harshness;
+;
+};
+
+Texture2D normalDepthTex :register(t0);
+SamplerState normalDepthSampler :register(s0);
+
+Texture2D randomOffsetsTex :register(t1);
+SamplerState randomOffsetsSampler :register(s1);
+
+struct PIn
+{
+    float4 posH : SV_POSITION;
+    float2 tex : TEXCOORD0;  
+    float4 eyeRayN: TEXCOORD1;
+};
+
+float4 ProcessPixel(PIn input) : SV_TARGET
+{
+    float4 normalDepthData = normalDepthTex.Sample(normalDepthSampler, input.tex);    
+    
+    float3 normalV = normalize(normalDepthData.xyz);    
+
+    //float4 eyeRayV = input.eyeRayV * normalDepthData.w;
+    //float3 viewRay = mul(eyeRayV, invProj).xyz;
+
+    float3 viewRay = mul(input.eyeRayN, invProj).xyz;
+    viewRay *= normalDepthData.w;
+             
+    float3 offset = normalize(2.0f * randomOffsetsTex.Sample(randomOffsetsSampler, input.tex * rndTexFactor).rgb  - 1.0f);     
+    
+    float totalOcclusion = 0.0f;
+    [unroll]
+    for(int i = 0; i < 16; i++){
+
+        float3 samplingRayL = reflect(kernel[i].xyz, offset);
+        samplingRayL *= sign(dot(samplingRayL, normalV));
+
+        float3 samplingPosV = viewRay + (samplingRayL * occlusionRadius);
+
+        float4 samplingPosH = mul(float4(samplingPosV, 1.0f), proj);
+        samplingPosH.xy /= samplingPosH.w;
+
+        float2 samplingTc;
+        samplingTc.x = 0.5f * samplingPosH.x + 0.5f;
+        samplingTc.y = -0.5f * samplingPosH.y + 0.5f;
+
+        float sampledDepth = normalDepthTex.Sample(normalDepthSampler, samplingTc).w;             
+        
+        float differnce = (sampledDepth - samplingPosV.z);	    	    
+
+        if(differnce < 0){
+            float3 toSamplingPos = normalize(samplingPosV - viewRay);
+            //float distanceFactor = saturate(occlusionRadius / abs(viewRay.z - sampledDepth));
+            float distanceFactor = (1.0f - saturate(abs(viewRay.z - sampledDepth) / occlusionRadius)) * harshness;
+            float normalFactor = saturate(dot(normalV, toSamplingPos));
+	        totalOcclusion += distanceFactor; //* saturate(normalFactor * 6.0f); 
+        }
+    }    
+
+    return pow(1.0f - (totalOcclusion / 16.0f), 2);    
+}

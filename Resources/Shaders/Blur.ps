@@ -1,0 +1,31 @@
+/*******************************************************************************
+    Author: Alexey Frolov (alexwin32@mail.ru)
+
+    This software is distributed freely under the terms of the MIT License.
+    See "LICENSE" or "http://copyfree.org/content/standard/licenses/mit/license.txt".
+*******************************************************************************/
+
+#include "BlurCommon.fxh"
+
+struct PIn 
+{
+    float4 posH : SV_POSITION;
+    float2 tex : TEXCOORD0;
+};
+
+Texture2D colorTex :register(t0);
+SamplerState colorSampler :register(s0);
+
+float4 ProcessPixel(PIn input) : SV_Target
+{   
+    float2 texOffset = (isVertical) ? float2(texFactors.x, 0.0f) : float2(0.0f, texFactors.y);
+        
+    int halfSize = 5;
+    float4 avgColor = 0;
+    
+    for(int i = -halfSize; i <= halfSize; ++i){
+        float2 texCoord = input.tex + texOffset * i;
+        avgColor += colorTex.Sample(colorSampler, texCoord) * weights[i + halfSize].x;
+    }
+    return avgColor;
+}

@@ -1,0 +1,16 @@
+/*******************************************************************************
+    Author: Alexey Frolov (alexwin32@mail.ru)
+
+    This software is distributed freely under the terms of the MIT License.
+    See "LICENSE" or "http://copyfree.org/content/standard/licenses/mit/license.txt".
+*******************************************************************************/
+
+#include "Gui.fxh"
+
+Texture2D colorTex :register(t0);
+SamplerState colorSampler :register(s0);
+
+float4 ProcessPixel(GsOutPsIn Input) : SV_TARGET
+{ 
+    return colorTex.Sample(colorSampler, Input.texCoord) * Input.color;
+}

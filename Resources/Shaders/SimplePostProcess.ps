@@ -1,0 +1,22 @@
+/*******************************************************************************
+    Author: Alexey Frolov (alexwin32@mail.ru)
+
+    This software is distributed freely under the terms of the MIT License.
+    See "LICENSE" or "http://copyfree.org/content/standard/licenses/mit/license.txt".
+*******************************************************************************/
+
+
+Texture2D colorTex :register(t0);
+SamplerState SampleType :register(s0);
+
+struct PIn
+{
+    float4 position : SV_POSITION;
+    float2 tex : TEXCOORD0;	
+};
+
+float4 ProcessPixel(PIn input) : SV_TARGET
+{
+    return colorTex.Sample(SampleType, input.tex); 
+}
+

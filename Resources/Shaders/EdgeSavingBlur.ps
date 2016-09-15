@@ -1,0 +1,57 @@
+/*******************************************************************************
+    Author: Alexey Frolov (alexwin32@mail.ru)
+
+    This software is distributed freely under the terms of the MIT License.
+    See "LICENSE" or "http://copyfree.org/content/standard/licenses/mit/license.txt".
+*******************************************************************************/
+
+#include "BlurCommon.fxh"
+
+struct PIn 
+{
+    float4 posH : SV_POSITION;
+    float2 tex : TEXCOORD0;
+};
+
+Texture2D colorTex :register(t0);
+SamplerState colorSampler :register(s0);
+
+Texture2D normalDepthTex :register(t1);
+SamplerState normalDepthSampler :register(s1);
+
+float4 ProcessPixel(PIn input) : SV_Target
+{
+    float2 texOffset = (isVertical) ? float2(0.0f, texFactors.y) : float2(texFactors.x, 0.0f);
+
+    float4 normalDepth = normalDepthTex.SampleLevel(normalDepthSampler, input.tex, 0);
+    float depth = normalDepth.w;
+    float3 normal = normalize(normalDepth.xyz);
+
+    int halfSize = 5;
+    float totalWeight = 0.0f;
+    float4 totalColor = 0.0f;
+
+    [unroll]
+    for(int i = -halfSize; i <= halfSize; ++i){
+
+        float2 texCoord = input.tex + texOffset * i;
+
+        float4 normalDepth2 = normalDepthTex.SampleLevel(normalDepthSampler, texCoord, 0);
+        float depth2 = normalDepth2.w;
+        float3 normal2 = normalize(normalDepth2.xyz);        
+
+        if(dot(normal2, normal) < 0.8f || abs(depth2 - depth) > 0.2f)
+            continue;
+
+        float weight = weights[halfSize + i].x;
+        totalWeight += weight;
+        totalColor += colorTex.Sample(colorSampler, texCoord) * weight;
+        
+        //edge hightlining 
+        //totalColor += colorTex.Sample(colorSampler, texCoord) * weight * saturate(1.0f / (abs(depth2 - depth) / 0.2f));
+    }
+
+    return totalColor / totalWeight;
+
+}
+

@@ -1,0 +1,104 @@
+/*******************************************************************************
+    Author: Alexey Frolov (alexwin32@mail.ru)
+
+    This software is distributed freely under the terms of the MIT License.
+    See "LICENSE" or "http://copyfree.org/content/standard/licenses/mit/license.txt".
+*******************************************************************************/
+
+struct PointLightMaterial
+{
+    float4 ambient;
+    float4 diffuse;
+    float4 specular; //w for padding
+    float intencity;
+    float fadeDisst;
+    float range;
+    float padding;
+};
+
+cbuffer buff1 : register(b0)
+{
+    PointLightMaterial pointLightMaterial;
+};
+
+cbuffer buff2 : register(b1)
+{
+    float3 eyeW;
+    float padding;
+
+    float3 pointLightPosW;
+    float padding2;
+};
+
+cbuffer buff3 : register(b2)
+{
+    float4 ambient;
+    float4 diffuse;
+    float4 specularWithPower;
+};
+
+cbuffer buff4 : register(b3)
+{
+    int useSsao;
+    int useColorTexture;
+    float2 padding3;
+}
+
+Texture2D colorTex :register(t0);
+SamplerState colorSampler :register(s0);
+
+Texture2D ssaoTex :register(t1);
+SamplerState ssaoSampler :register(s1);
+
+struct PIn
+{
+    float4 posS : SV_POSITION;
+    float3 normalL : NORMAL;
+    float2 tex : TEXCOORD0;
+    float4 posH : TEXCOORD1; 
+    float3 posW : TEXCOORD2;
+};
+
+float4 ProcessPixel(PIn input) : SV_TARGET
+{
+    input.normalL = normalize(input.normalL);
+
+    float3 toLight = pointLightPosW - input.posW;
+
+    float disst = length(toLight);//sqrt(toLight.x * toLight.x + toLight.y * toLight.y + toLight.z * toLight.z);
+        
+    toLight /= disst;
+
+    float diff = saturate(dot(toLight, input.normalL));
+    float spec = 0.0f;
+
+    if(diff > 0){
+        float3 fromLight = -toLight;
+        float3 reflect = fromLight - (2 * (input.normalL * dot(input.normalL, fromLight)));
+        reflect = normalize(reflect);
+
+        float3 toEye = normalize(eyeW.xyz - input.posW);        
+
+        spec = pow(saturate(dot(toEye, reflect)), specularWithPower.w);    
+    }
+
+    float att = 1.0f - saturate((disst - pointLightMaterial.range) / pointLightMaterial.fadeDisst);
+    att *= pointLightMaterial.intencity;
+
+    float4 texCol = (useColorTexture) ? colorTex.Sample(colorSampler, input.tex) : 1.0f;
+
+    float ssaoFactor = 1.0f;
+    if(useSsao){
+
+        float4 posN = input.posH / input.posH.w;
+        float2 samplingTc = float2(0.5f, -0.5) * posN.xy + 0.5f;
+
+        ssaoFactor = ssaoTex.Sample(ssaoSampler, samplingTc).r;
+    }
+
+    float4 A = (ambient * pointLightMaterial.ambient) * ssaoFactor;
+    float4 D = diffuse * pointLightMaterial.diffuse;
+    float4 S = float4(specularWithPower.xyz, 0.0f) * pointLightMaterial.specular;
+
+    return (A + D * texCol * diff + S * spec) * att;
+}
